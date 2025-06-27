@@ -8,8 +8,13 @@ from db import SessionLocal
 from models import User
 from jwt import PyJWTError
 from constants import errors
+from dotenv import load_dotenv
 import jwt
 import os
+
+
+load_dotenv()
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="sign-in")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

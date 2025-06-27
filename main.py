@@ -1,7 +1,15 @@
 from fastapi import FastAPI
 from routers import authRouter
 from db import engine, Base
+from dotenv import load_dotenv
 import uvicorn
+import os
+
+
+load_dotenv()
+
+
+PORT = os.getenv("PORT", 8000)
 
 
 async def lifespan(app: FastAPI):
@@ -16,5 +24,5 @@ app.include_router(authRouter, prefix='/api')
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))  # Render використовує PORT із env
+    port = int(PORT)
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
