@@ -15,5 +15,6 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(authRouter, prefix='/api')
 
 
-if __name__ == '__main__':
-    uvicorn.run('main:app', reload=True)
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))  # Render використовує PORT із env
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
