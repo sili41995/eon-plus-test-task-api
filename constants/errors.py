@@ -1,0 +1,5 @@
+INCORRECT_CREDENTIALS = "Incorrect credentials"
+EMAIL_ALREADY_USE = "Email already use"
+INVALID_TOKEN = "Invalid token"
+USER_NOT_FOUND = "User not found"
+TOKEN_REVOKED = "Token has been revoked"
