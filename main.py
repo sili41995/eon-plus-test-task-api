@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from routers import authRouter, telegramRouter
 from db import engine, Base
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
 
@@ -18,6 +19,19 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+origins = [
+    "http://localhost:5173",
+    'https://eon-plus-test-task.vercel.app'
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 app.include_router(authRouter, prefix='/api', tags=['Authentication'])
