@@ -1,3 +1,4 @@
+from constants import errors
 from dotenv import load_dotenv
 from models.user import User
 from schemas import PhoneNumber, VerificationCode
@@ -41,7 +42,7 @@ async def telegram_connect(data: PhoneNumber, user: User = Depends(get_current_u
         await client.send_code_request(data.phone)
         return {"status": "code_sent"}
 
-    return {"status": "already_authorized"}
+    return {"status": errors.ALREADY_AUTH}
 
 
 @router.post("/telegram/verify")
@@ -49,15 +50,15 @@ async def telegram_verify(data: VerificationCode, user: User = Depends(get_curre
     username = user.login
     client = user_telegram_sessions.get(username)
     if not client:
-        raise HTTPException(status_code=400, detail="Session not found")
+        raise HTTPException(status_code=400, detail=errors.SESSION_NOT_FOUND)
 
     try:
         await client.sign_in(data.phone, data.code)
         logger.info(f"User {username} verified Telegram code")
         return {"status": "connected"}
     except Exception as e:
-        logger.error(f"Verification failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid code")
+        logger.error(f"{errors.VERIFICATION_FAILED}: {e}")
+        raise HTTPException(status_code=400, detail=errors.INVALID_CODE)
 
 
 @router.get("/telegram/chats")
@@ -66,7 +67,7 @@ async def get_chats(user: User = Depends(get_current_user)):
     client = user_telegram_sessions.get(username)
 
     if not client or not await client.is_user_authorized():
-        raise HTTPException(status_code=400, detail="Telegram not connected")
+        raise HTTPException(status_code=400, detail=errors.TG_NOT_CONNECTED)
 
     dialogs = await client.get_dialogs()
     return [
@@ -82,7 +83,7 @@ async def get_messages(chat_id: int, user: User = Depends(get_current_user)):
     client = user_telegram_sessions.get(username)
 
     if not client or not await client.is_user_authorized():
-        raise HTTPException(status_code=400, detail="Telegram not connected")
+        raise HTTPException(status_code=400, detail=errors.TG_NOT_CONNECTED)
 
     try:
         messages = []
@@ -95,5 +96,5 @@ async def get_messages(chat_id: int, user: User = Depends(get_current_user)):
             })
         return messages[::-1]
     except Exception as e:
-        logger.error(f"Failed to fetch messages: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch messages")
+        logger.error(f"{errors.MSG_NOT_FOUND}: {e}")
+        raise HTTPException(status_code=500, detail=errors.MSG_NOT_FOUND)
