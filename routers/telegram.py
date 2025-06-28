@@ -1,11 +1,11 @@
 from constants import errors
 from dotenv import load_dotenv
 from models.user import User
-from schemas import PhoneNumber, VerificationCode
+from schemas import PhoneNumber, VerificationCode, Message, Chat, SuccessConnectedMsg, ConnectedStatus
 from fastapi import APIRouter, Depends, HTTPException
-from schemas.user import UserBase
 from services import get_current_user
 from telethon import TelegramClient
+from typing import List
 import re
 import os
 import logging
@@ -27,8 +27,8 @@ user_telegram_sessions = {}
 
 
 @router.post("/telegram/connect")
-async def telegram_connect(data: PhoneNumber, user: User = Depends(get_current_user)):
-    username = user.login  # беремо логін користувача
+async def telegram_connect(data: PhoneNumber, user: User = Depends(get_current_user)) -> ConnectedStatus:
+    username = user.login
 
     session_dir = "sessions"
     os.makedirs(session_dir, exist_ok=True)
@@ -46,7 +46,7 @@ async def telegram_connect(data: PhoneNumber, user: User = Depends(get_current_u
 
 
 @router.post("/telegram/verify")
-async def telegram_verify(data: VerificationCode, user: User = Depends(get_current_user)):
+async def telegram_verify(data: VerificationCode, user: User = Depends(get_current_user)) -> SuccessConnectedMsg:
     username = user.login
     client = user_telegram_sessions.get(username)
     if not client:
@@ -55,14 +55,14 @@ async def telegram_verify(data: VerificationCode, user: User = Depends(get_curre
     try:
         await client.sign_in(data.phone, data.code)
         logger.info(f"User {username} verified Telegram code")
-        return {"status": "connected"}
+        return {"success": True}
     except Exception as e:
         logger.error(f"{errors.VERIFICATION_FAILED}: {e}")
         raise HTTPException(status_code=400, detail=errors.INVALID_CODE)
 
 
 @router.get("/telegram/chats")
-async def get_chats(user: User = Depends(get_current_user)):
+async def get_chats(user: User = Depends(get_current_user)) -> List[Chat]:
     username = user.login
     client = user_telegram_sessions.get(username)
 
@@ -78,7 +78,7 @@ async def get_chats(user: User = Depends(get_current_user)):
 
 
 @router.get("/telegram/messages/{chat_id}")
-async def get_messages(chat_id: int, user: User = Depends(get_current_user)):
+async def get_messages(chat_id: int, user: User = Depends(get_current_user)) -> Message:
     username = user.login
     client = user_telegram_sessions.get(username)
 

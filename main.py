@@ -20,8 +20,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-app.include_router(authRouter, prefix='/api')
-app.include_router(telegramRouter, prefix='/api')
+app.include_router(authRouter, prefix='/api', tags=['Authentication'])
+app.include_router(telegramRouter, prefix='/api', tags=['TG Chats'])
 
 
 if __name__ == "__main__":
