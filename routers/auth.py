@@ -9,7 +9,7 @@ from models import User
 router = APIRouter()
 
 
-@router.post("/sign-up", response_model=UserOut, status_code=201)
+@router.post("/auth/sign-up", response_model=UserOut, status_code=201)
 async def sign_up(user: UserSignUp, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(select(User).where(User.login == user.login))
     if existing.scalar_one_or_none():
@@ -28,7 +28,7 @@ async def sign_up(user: UserSignUp, db: AsyncSession = Depends(get_db)):
     return new_user
 
 
-@router.post("/sign-in", response_model=Token)
+@router.post("/auth/sign-in", response_model=Token)
 async def sign_in(user: UserSignIn, db: AsyncSession = Depends(get_db)):
     user_db = await authenticate_user(user.email, user.password, db)
     if not user_db:
@@ -38,11 +38,11 @@ async def sign_in(user: UserSignIn, db: AsyncSession = Depends(get_db)):
     return {"access_token": token, "token_type": "bearer"}
 
 
-@router.post("/sign-out")
+@router.post("/auth/sign-out")
 async def get_profile(_=Depends(get_current_user)):
     return {"message": messages.SUCCESSFULLY_SIGN_OUT}
 
 
-@router.get("/current", response_model=UserOut)
+@router.get("/auth/current", response_model=UserOut)
 async def get_profile(current_user: User = Depends(get_current_user)):
     return current_user

@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import authRouter
+from routers import authRouter, telegramRouter
 from db import engine, Base
 from dotenv import load_dotenv
 import uvicorn
@@ -21,6 +21,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 app.include_router(authRouter, prefix='/api')
+app.include_router(telegramRouter, prefix='/api')
 
 
 if __name__ == "__main__":

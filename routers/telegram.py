@@ -1,0 +1,99 @@
+from dotenv import load_dotenv
+from models.user import User
+from schemas import PhoneNumber, VerificationCode
+from fastapi import APIRouter, Depends, HTTPException
+from schemas.user import UserBase
+from services import get_current_user
+from telethon import TelegramClient
+import re
+import os
+import logging
+
+
+load_dotenv()
+
+
+logger = logging.getLogger("telegram")
+
+
+API_ID = int(os.getenv("TELEGRAM_API_ID"))
+API_HASH = os.getenv("TELEGRAM_API_HASH")
+
+router = APIRouter()
+
+
+user_telegram_sessions = {}
+
+
+@router.post("/telegram/connect")
+async def telegram_connect(data: PhoneNumber, user: User = Depends(get_current_user)):
+    username = user.login  # беремо логін користувача
+
+    session_dir = "sessions"
+    os.makedirs(session_dir, exist_ok=True)
+    session_name = os.path.join(session_dir, f"session_{username}")
+
+    client = TelegramClient(session_name, API_ID, API_HASH)
+    await client.connect()
+    user_telegram_sessions[username] = client
+
+    if not await client.is_user_authorized():
+        await client.send_code_request(data.phone)
+        return {"status": "code_sent"}
+
+    return {"status": "already_authorized"}
+
+
+@router.post("/telegram/verify")
+async def telegram_verify(data: VerificationCode, user: User = Depends(get_current_user)):
+    username = user.login
+    client = user_telegram_sessions.get(username)
+    if not client:
+        raise HTTPException(status_code=400, detail="Session not found")
+
+    try:
+        await client.sign_in(data.phone, data.code)
+        logger.info(f"User {username} verified Telegram code")
+        return {"status": "connected"}
+    except Exception as e:
+        logger.error(f"Verification failed: {e}")
+        raise HTTPException(status_code=400, detail="Invalid code")
+
+
+@router.get("/telegram/chats")
+async def get_chats(user: User = Depends(get_current_user)):
+    username = user.login
+    client = user_telegram_sessions.get(username)
+
+    if not client or not await client.is_user_authorized():
+        raise HTTPException(status_code=400, detail="Telegram not connected")
+
+    dialogs = await client.get_dialogs()
+    return [
+        {"id": dialog.id, "name": dialog.name,
+            "type": type(dialog.entity).__name__}
+        for dialog in dialogs if dialog.name
+    ]
+
+
+@router.get("/telegram/messages/{chat_id}")
+async def get_messages(chat_id: int, user: User = Depends(get_current_user)):
+    username = user.login
+    client = user_telegram_sessions.get(username)
+
+    if not client or not await client.is_user_authorized():
+        raise HTTPException(status_code=400, detail="Telegram not connected")
+
+    try:
+        messages = []
+        async for message in client.iter_messages(chat_id, limit=30):
+            messages.append({
+                "id": message.id,
+                "sender_id": message.sender_id,
+                "text": message.message,
+                "date": str(message.date)
+            })
+        return messages[::-1]
+    except Exception as e:
+        logger.error(f"Failed to fetch messages: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch messages")
