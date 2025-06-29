@@ -92,7 +92,7 @@ async def get_chats(user: User = Depends(get_current_user)) -> List[Chat]:
 
 
 @router.get("/telegram/messages/{chat_id}")
-async def get_messages(chat_id: int, user: User = Depends(get_current_user)) -> Message:
+async def get_messages(chat_id: int, user: User = Depends(get_current_user)) -> List[Message]:
     username = user.login
     client = await get_telegram_client(username)
 
