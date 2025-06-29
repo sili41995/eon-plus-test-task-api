@@ -22,7 +22,7 @@ class Message(BaseModel):
 class Chat(BaseModel):
     id: int
     name: str
-    type: Literal["Chat", "Channel"]
+    type: Literal["Chat", "Channel","User"]
 
 
 class SuccessConnectedMsg(BaseModel):
