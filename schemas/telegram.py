@@ -13,7 +13,7 @@ class VerificationCode(BaseModel):
 
 
 class Message(BaseModel):
-    id: str
+    id: int
     sender_id: int
     text: str
     date: datetime
@@ -22,7 +22,7 @@ class Message(BaseModel):
 class Chat(BaseModel):
     id: int
     name: str
-    type: Literal["Chat", "Channel","User"]
+    type: Literal["Chat", "Channel", "User"]
 
 
 class SuccessConnectedMsg(BaseModel):
