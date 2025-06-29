@@ -9,34 +9,47 @@ from typing import List
 import re
 import os
 import logging
+import asyncio
 
 
 load_dotenv()
-
-
 logger = logging.getLogger("telegram")
-
 
 API_ID = int(os.getenv("TELEGRAM_API_ID"))
 API_HASH = os.getenv("TELEGRAM_API_HASH")
 
 router = APIRouter()
 
+# Глобальні кеші сесій
+user_telegram_sessions: dict[str, TelegramClient] = {}
+user_session_locks: dict[str, asyncio.Lock] = {}
 
-user_telegram_sessions = {}
+# Централізований доступ до клієнта
+
+
+async def get_telegram_client(username: str) -> TelegramClient:
+    session_dir = "sessions"
+    os.makedirs(session_dir, exist_ok=True)
+    session_name = os.path.join(session_dir, f"session_{username}")
+
+    # Створення lock для кожного користувача
+    if username not in user_session_locks:
+        user_session_locks[username] = asyncio.Lock()
+
+    async with user_session_locks[username]:
+        if username in user_telegram_sessions:
+            return user_telegram_sessions[username]
+
+        client = TelegramClient(session_name, API_ID, API_HASH)
+        await client.connect()
+        user_telegram_sessions[username] = client
+        return client
 
 
 @router.post("/telegram/connect")
 async def telegram_connect(data: PhoneNumber, user: User = Depends(get_current_user)) -> ConnectedStatus:
     username = user.login
-
-    session_dir = "sessions"
-    os.makedirs(session_dir, exist_ok=True)
-    session_name = os.path.join(session_dir, f"session_{username}")
-
-    client = TelegramClient(session_name, API_ID, API_HASH)
-    await client.connect()
-    user_telegram_sessions[username] = client
+    client = await get_telegram_client(username)
 
     if not await client.is_user_authorized():
         await client.send_code_request(data.phone)
@@ -48,7 +61,8 @@ async def telegram_connect(data: PhoneNumber, user: User = Depends(get_current_u
 @router.post("/telegram/verify")
 async def telegram_verify(data: VerificationCode, user: User = Depends(get_current_user)) -> SuccessConnectedMsg:
     username = user.login
-    client = user_telegram_sessions.get(username)
+    client = await get_telegram_client(username)
+
     if not client:
         raise HTTPException(status_code=400, detail=errors.SESSION_NOT_FOUND)
 
@@ -64,7 +78,7 @@ async def telegram_verify(data: VerificationCode, user: User = Depends(get_curre
 @router.get("/telegram/chats")
 async def get_chats(user: User = Depends(get_current_user)) -> List[Chat]:
     username = user.login
-    client = user_telegram_sessions.get(username)
+    client = await get_telegram_client(username)
 
     if not client or not await client.is_user_authorized():
         raise HTTPException(status_code=400, detail=errors.TG_NOT_CONNECTED)
@@ -72,7 +86,7 @@ async def get_chats(user: User = Depends(get_current_user)) -> List[Chat]:
     dialogs = await client.get_dialogs()
     return [
         {"id": dialog.id, "name": dialog.name,
-            "type": type(dialog.entity).__name__}
+         "type": type(dialog.entity).__name__}
         for dialog in dialogs if dialog.name
     ]
 
@@ -80,7 +94,7 @@ async def get_chats(user: User = Depends(get_current_user)) -> List[Chat]:
 @router.get("/telegram/messages/{chat_id}")
 async def get_messages(chat_id: int, user: User = Depends(get_current_user)) -> Message:
     username = user.login
-    client = user_telegram_sessions.get(username)
+    client = await get_telegram_client(username)
 
     if not client or not await client.is_user_authorized():
         raise HTTPException(status_code=400, detail=errors.TG_NOT_CONNECTED)
@@ -98,3 +112,14 @@ async def get_messages(chat_id: int, user: User = Depends(get_current_user)) -> 
     except Exception as e:
         logger.error(f"{errors.MSG_NOT_FOUND}: {e}")
         raise HTTPException(status_code=500, detail=errors.MSG_NOT_FOUND)
+
+
+@router.post("/telegram/disconnect")
+async def telegram_disconnect(user: User = Depends(get_current_user)) -> SuccessConnectedMsg:
+    username = user.login
+    client = user_telegram_sessions.pop(username, None)
+
+    if client:
+        await client.disconnect()
+
+    return {"success": True}
