@@ -117,9 +117,14 @@ async def get_messages(chat_id: int, user: User = Depends(get_current_user)) -> 
 @router.post("/telegram/disconnect")
 async def telegram_disconnect(user: User = Depends(get_current_user)) -> SuccessConnectedMsg:
     username = user.login
+    session_path = os.path.join("sessions", f"session_{username}")
+
     client = user_telegram_sessions.pop(username, None)
 
     if client:
         await client.disconnect()
+
+    if os.path.exists(session_path):
+        os.remove(session_path)
 
     return {"success": True}
